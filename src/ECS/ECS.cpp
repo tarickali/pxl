@@ -1,6 +1,9 @@
 #include "ECS.h"
+#include "../Logger/Logger.h"
 
 #include <algorithm>
+
+int IComponent::nextId = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Entity
@@ -9,6 +12,9 @@ unsigned int Entity::GetId() const {
     return id;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// System
+////////////////////////////////////////////////////////////////////////////////
 void System::AddEntityToSystem(Entity entity) {
     entities.push_back(entity);
 }
@@ -32,4 +38,39 @@ std::vector<Entity> System::GetSystemEntities() const {
 
 const Signature &System::GetComponentSignature() const {
     return componentSignature;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// World
+////////////////////////////////////////////////////////////////////////////////
+Entity World::CreateEntity() {
+    Entity entity(numEntities++);
+    entitiesToBeCreated.insert(entity);
+
+    Logger::Log("Entity created with id = " + std::to_string(entity.GetId()));
+
+    return entity;
+}
+
+void World::Update() {
+    // Add the entities that are waiting to be created to the active Systems
+    // Remove the entities that are waiting to be created to the active Systems
+}
+
+void World::AddEntityToSystems(Entity entity) {
+    const auto entityId = entity.GetId();
+
+    // TODO: Match entityComponentSignature <---> systemComponentSignature
+    const auto &entityComponentSignature = entityComponentSignatures[entityId];
+
+    for (auto &system : systems) {
+        const auto &systemComponentSignature = system.second->GetComponentSignature();
+
+        bool isInterested = (entityComponentSignature & systemComponentSignature) == systemComponentSignature;
+
+        if (isInterested) {
+            system.second->AddEntityToSystem(entity);
+        }
+    }
+
 }
