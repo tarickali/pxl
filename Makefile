@@ -8,7 +8,8 @@ INCLUDE_PATH = -I "./libs"
 SRC_FILES = ./src/*.cpp \
 			./src/Game/*.cpp \
 			./src/Logger/*.cpp \
-			./src/ECS/*.cpp
+			./src/ECS/*.cpp \
+			./src/AssetStore/*.cpp
 LINKER_FLAGS = -l SDL2 -l SDL2_image -l SDL2_ttf -l SDL2_mixer -l lua
 OBJ_NAME = engine
 

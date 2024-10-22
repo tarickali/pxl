@@ -3,6 +3,7 @@
 
 #include "../Logger/Logger.h"
 
+#include <iostream>
 #include <bitset>
 #include <vector>
 #include <unordered_map>
@@ -115,7 +116,7 @@ class Pool : public IPool {
 
         bool IsEmpty() const { return data.empty(); }
         int GetSize() const { return data.size(); }
-        void Resize(int n) { data.reserve(n); }
+        void Resize(int n) { data.resize(n); }
         void Clear() { data.clear(); }
         void Add(T object) { data.push_back(object); }
         void Set(int index, T object) { data[index] = object; }
@@ -228,13 +229,13 @@ void World::AddComponent(Entity entity, TArgs &&...args) {
         std::shared_ptr<Pool<TComponent>> newComponentPool = std::make_shared<Pool<TComponent>>();
         componentPools[componentId] = newComponentPool;
     }
-    
+ 
     // Get the component pool
     std::shared_ptr<Pool<TComponent>> componentPool = std::static_pointer_cast<Pool<TComponent>>(componentPools[componentId]);
 
     // Resize componentPool if necessary to accomadate new entity
     if (entityId >= static_cast<unsigned int>(componentPool->GetSize())) {
-        componentPool->Resize(numEntities);
+        componentPool->Resize(entityId + 1);
     }
 
     TComponent newComponent(std::forward<TArgs>(args)...);

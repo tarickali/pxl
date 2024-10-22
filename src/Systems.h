@@ -4,7 +4,9 @@
 #include "ECS/ECS.h"
 #include "Components.h"
 #include "Logger/Logger.h"
+#include "AssetStore/AssetStore.h"
 
+#include <algorithm>
 #include <SDL2/SDL.h>
 
 class MovementSystem : public System {
@@ -44,20 +46,58 @@ class RenderSystem : public System {
             RequireComponent<SpriteComponent>();
         }
 
-        void Update(SDL_Renderer *renderer) {
-            for (auto entity : GetSystemEntities()) {
+        void Update(SDL_Renderer *renderer, std::unique_ptr<AssetStore> &assetStore) {
+            // Sort all the entities of our system by z-index
+            auto entities = GetSystemEntities();
+            std::sort(entities.begin(), entities.end(), [](const Entity &a, const Entity &b) {
+                return a.GetComponent<SpriteComponent>().zIndex < b.GetComponent<SpriteComponent>().zIndex;
+            });
+
+            for (auto entity : entities) {
                 const auto transform = entity.GetComponent<TransformComponent>();
                 const auto sprite = entity.GetComponent<SpriteComponent>();
 
-                SDL_Rect objRect = {
+                auto texture = assetStore->GetTexture(sprite.assetId);
+
+                SDL_Rect srcRect = sprite.srcRect;
+
+                SDL_Rect dstRect = {
                     static_cast<int>(transform.position.x),
                     static_cast<int>(transform.position.y),
-                    sprite.width,
-                    sprite.height
+                    static_cast<int>(sprite.width * transform.scale.x),
+                    static_cast<int>(sprite.height * transform.scale.y)
                 };
 
-                SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-                SDL_RenderFillRect(renderer, &objRect);
+                SDL_RenderCopyEx(
+                    renderer,
+                    texture,
+                    &srcRect,
+                    &dstRect,
+                    transform.rotation,
+                    NULL,
+                    SDL_FLIP_NONE
+                );
+            }
+        }
+};
+
+class AnimationSystem : public System {
+    public:
+        AnimationSystem() {
+            RequireComponent<SpriteComponent>();
+            RequireComponent<AnimationComponent>();
+        }
+
+        void Update() {
+            for (auto entity : GetSystemEntities()) {
+                auto &animation = entity.GetComponent<AnimationComponent>();
+                auto &sprite = entity.GetComponent<SpriteComponent>();
+
+                animation.currentFrame = (
+                    (SDL_GetTicks() - animation.startTime) * animation.frameSpeedRate / 1000
+                ) % animation.numFrames;
+
+                sprite.srcRect.x = animation.currentFrame * sprite.width;
             }
         }
 };

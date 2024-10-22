@@ -5,6 +5,8 @@
 #include "../Systems.h"
 
 #include <iostream>
+#include <fstream>
+#include <sstream>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
 #include <glm/glm.hpp>
@@ -12,7 +14,9 @@
 
 Game::Game() {
     isRunning = false;
+
     world = std::make_unique<World>();
+    assetStore = std::make_unique<AssetStore>();
 
     Logger::Log("Game constructor called.");
 }
@@ -95,32 +99,104 @@ void Game::ProcessInput() {
     }
 }
 
-void Game::Setup() {
+void Game::LoadLevel(int level) {
+    // Add the systems need to be by our game
     world->AddSystem<MovementSystem>();
     world->AddSystem<RenderSystem>();
+    world->AddSystem<AnimationSystem>();
+
+    // Adding asets to the asset store
+    assetStore->AddTexture(renderer, "tank-image", "./assets/images/tank-panther-right.png");
+    assetStore->AddTexture(renderer, "truck-image", "./assets/images/truck-ford-right.png");
+    assetStore->AddTexture(renderer, "chopper-image", "./assets/images/chopper.png");
+    assetStore->AddTexture(renderer, "radar-image", "./assets/images/radar.png");
+    assetStore->AddTexture(renderer, "tilemap-image", "./assets/tilemaps/jungle.png");
+
+    ///////////////////////////////////////////////////////////////////////////
+    // Load the tilemap
+    ///////////////////////////////////////////////////////////////////////////
+    // Add the tilemap texture to the asset store
+
+    // Set tile parameters
+    int tileSize = 32;
+    double tileScale = 2.0;
+
+    // Open the map file for the level layout
+    std::fstream mapFile("./assets/tilemaps/jungle.map", std::ios::in);
+    if (!mapFile) {
+        std::cerr << "Error opening file!" << std::endl;
+        throw;
+    }
+
+    // Read the level layout
+    std::string line;
+    int y = 0;
+    while (std::getline(mapFile, line)) {
+        std::stringstream ss(line);
+        std::string value;
+
+        int x = 0;
+        while (std::getline(ss, value, ',')) {
+            int srcRectY = (value[0] - '0') * tileSize;
+            int srcRectX = (value[1] - '0') * tileSize;
+
+            Entity tile  = world->CreateEntity();
+            tile.AddComponent<TransformComponent>(glm::vec2(x * (tileSize * tileScale), y * (tileSize * tileScale)), glm::vec2(tileScale, tileScale));
+            tile.AddComponent<SpriteComponent>("tilemap-image", tileSize, tileSize, 0, srcRectX, srcRectY);
+
+            x += 1;
+        }
+        y += 1;
+    }
+    mapFile.close();
+
+    Entity chopper = world->CreateEntity();
+    chopper.AddComponent<TransformComponent>(
+        glm::vec2(10.0, 10.0),
+        glm::vec2(1.0, 1.0),
+        0.0
+    );
+    chopper.AddComponent<RigidBodyComponent>(glm::vec2(0.0, 0.0));
+    chopper.AddComponent<SpriteComponent>("chopper-image", 32, 32, 1);
+    chopper.AddComponent<AnimationComponent>(2, 10, true);
+
+    SDL_DisplayMode displayMode;
+    SDL_GetCurrentDisplayMode(0, &displayMode);
+
+    Entity radar = world->CreateEntity();
+    radar.AddComponent<TransformComponent>(
+        glm::vec2(displayMode.w - 74.0, 10.0),
+        glm::vec2(1.0, 1.0),
+        0.0
+    );
+    radar.AddComponent<SpriteComponent>("radar-image", 64, 64, 2);
+    radar.AddComponent<AnimationComponent>(8, 5, true);
 
     Entity tank = world->CreateEntity();
-    Entity truck = world->CreateEntity();
-
     tank.AddComponent<TransformComponent>(
-        glm::vec2(10.0, 30.0),
+        glm::vec2(10.0, 10.0),
         glm::vec2(1.0, 1.0),
         0.0
     );
     tank.AddComponent<RigidBodyComponent>(
-        glm::vec2(40.0, 0.0)
+        glm::vec2(20.0, 0.0)
     );
-    tank.AddComponent<SpriteComponent>(10, 10);
+    tank.AddComponent<SpriteComponent>("tank-image", 32, 32, 1);
 
+    Entity truck = world->CreateEntity();
     truck.AddComponent<TransformComponent>(
         glm::vec2(100.0, 100.0),
         glm::vec2(1.0, 1.0),
         0.0
     );
     truck.AddComponent<RigidBodyComponent>(
-        glm::vec2(0.0, 50.0)
+        glm::vec2(-30.0, 0.0)
     );
-    truck.AddComponent<SpriteComponent>(10, 50);
+    truck.AddComponent<SpriteComponent>("truck-image", 32, 32, 1);
+}
+
+void Game::Setup() {
+    LoadLevel(1);
 }
 
 void Game::Update() {
@@ -141,6 +217,7 @@ void Game::Update() {
 
     // Update game objects
     world->GetSystem<MovementSystem>().Update(deltaTime);
+    world->GetSystem<AnimationSystem>().Update();
     world->Update();
 }
 
@@ -149,7 +226,7 @@ void Game::Render() {
     SDL_RenderClear(renderer);
 
     // Invoke all the systems that need to be updated
-    world->GetSystem<RenderSystem>().Update(renderer);
+    world->GetSystem<RenderSystem>().Update(renderer, assetStore);
 
     SDL_RenderPresent(renderer);
 }
