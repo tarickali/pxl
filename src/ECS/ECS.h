@@ -1,11 +1,15 @@
 #ifndef ECS_H
 #define ECS_H
 
+#include "../Logger/Logger.h"
+
 #include <bitset>
 #include <vector>
 #include <unordered_map>
 #include <typeindex>
 #include <set>
+#include <memory>
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Signature
@@ -33,6 +37,18 @@ class Entity {
         Entity &operator =(const Entity &other) = default;
         bool operator ==(const Entity &other) const { return id == other.id; }
         bool operator !=(const Entity &other) const { return id != other.id; }
+        bool operator <(const Entity &other) const { return id < other.id; }
+        bool operator <=(const Entity &other) const { return id <= other.id; }
+        bool operator >(const Entity &other) const { return id > other.id; }
+        bool operator >=(const Entity &other) const { return id >= other.id; }
+
+        template <typename TComponent, typename ...TArgs> void AddComponent(TArgs &&...args);
+        template <typename TComponent> void RemoveComponent();
+        template <typename TComponent> bool HasComponent();
+        template <typename TComponent> TComponent &GetComponent() const;
+
+        // Pointer to the entity's owner world
+        class World *world;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -42,16 +58,17 @@ class Entity {
 ////////////////////////////////////////////////////////////////////////////////
 struct IComponent {
     protected:
-        static int nextId;
+        static unsigned int nextId;
 };
 
 // Used to assign a unique id to a component type
 template <typename T>
 class Component : public IComponent {
-    static int GetId() {
-        static auto id = nextId++;
-        return id;
-    }
+    public:
+        static unsigned int GetId() {
+            static auto id = nextId++;
+            return id;
+        }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -123,18 +140,23 @@ class World {
         // certain component type.
         // [Vector index = component type id]
         // [Pool index = entity id]
-        std::vector<IPool *> componentPools;
+        std::vector<std::shared_ptr<IPool>> componentPools;
 
         // Vector of component signatures per entity, saying which component
         // is turned "on" for each entity.
         // [Vector index = entity id]
         std::vector<Signature> entityComponentSignatures;
 
-        std::unordered_map<std::type_index, System *> systems;
+        std::unordered_map<std::type_index, std::shared_ptr<System>> systems;
 
     public:
-        World() = default;
-        ~World() = default;
+        World()  {
+            Logger::Log("World created");
+        }
+
+        ~World() {
+            Logger::Log("World destroyed");
+        }
 
         // Entity management
         Entity CreateEntity();
@@ -144,6 +166,7 @@ class World {
         template <typename TComponent, typename ...TArgs> void AddComponent(Entity entity, TArgs &&...args);
         template <typename TComponent> void RemoveComponent(Entity entity);
         template <typename TComponent> bool HasComponent(Entity entity) const;
+        template <typename TComponent> TComponent &GetComponent(Entity entity) const;
 
         // System management
         template <typename TSystem, typename ...TArgs> void AddSystem(TArgs &&...args);
@@ -162,6 +185,25 @@ class World {
 ////////////////////////////////////////////////////////////////////////////////
 // Template Implementations
 ////////////////////////////////////////////////////////////////////////////////
+template <typename TComponent, typename ...TArgs>
+void Entity::AddComponent(TArgs &&...args) {
+    world->AddComponent<TComponent>(*this, std::forward<TArgs>(args)...);
+}
+
+template <typename TComponent>
+void Entity::RemoveComponent() {
+    world->RemoveComponent<TComponent>(*this);
+}
+
+template <typename TComponent>
+bool Entity::HasComponent() {
+    return world->HasComponent<TComponent>(*this);
+}
+
+template <typename TComponent>
+TComponent &Entity::GetComponent() const {
+    return world->GetComponent<TComponent>(*this);
+}
 
 // System
 template <typename TComponent>
@@ -174,7 +216,7 @@ void System::RequireComponent() {
 template <typename TComponent, typename ...TArgs>
 void World::AddComponent(Entity entity, TArgs &&...args) {
     const auto componentId = Component<TComponent>::GetId();
-    const auto entityId = entity.GetId()
+    const auto entityId = entity.GetId();
 
     // Resize componentPools if necessary to accomadate new component
     if (componentId >= componentPools.size()) {
@@ -183,15 +225,15 @@ void World::AddComponent(Entity entity, TArgs &&...args) {
 
     // Add new component pool if necessary
     if (!componentPools[componentId]) {
-        Pool<TComponent> *newComponentPool = new Pool<TComponent>();
+        std::shared_ptr<Pool<TComponent>> newComponentPool = std::make_shared<Pool<TComponent>>();
         componentPools[componentId] = newComponentPool;
     }
     
     // Get the component pool
-    Pool<TComponent> *componentPool = componentPools[componentId];
+    std::shared_ptr<Pool<TComponent>> componentPool = std::static_pointer_cast<Pool<TComponent>>(componentPools[componentId]);
 
     // Resize componentPool if necessary to accomadate new entity
-    if (entityId >= componentPool->GetSize()) {
+    if (entityId >= static_cast<unsigned int>(componentPool->GetSize())) {
         componentPool->Resize(numEntities);
     }
 
@@ -200,6 +242,8 @@ void World::AddComponent(Entity entity, TArgs &&...args) {
     componentPool->Set(entityId, newComponent);
 
     entityComponentSignatures[entityId].set(componentId);
+
+    Logger::Log("Component id = " + std::to_string(componentId) + " was added to entity id " + std::to_string(entityId));
 }
 
 template <typename TComponent>
@@ -207,6 +251,8 @@ void World::RemoveComponent(Entity entity) {
     const auto componentId = Component<TComponent>::GetId();
     const auto entityId = entity.GetId();    
     entityComponentSignatures[entityId].set(componentId, false);
+
+    Logger::Log("Component id = " + std::to_string(componentId) + " was removed to entity id " + std::to_string(entityId));
 }
 
 template <typename TComponent>
@@ -216,9 +262,18 @@ bool World::HasComponent(Entity entity) const {
     return entityComponentSignatures[entityId].test(componentId);
 }
 
+template <typename TComponent>
+TComponent &World::GetComponent(Entity entity) const {
+    const auto componentId = Component<TComponent>::GetId();
+    const auto entityId = entity.GetId();
+    auto componentPool = std::static_pointer_cast<Pool<TComponent>>(componentPools[componentId]);
+
+    return componentPool->Get(entityId);
+}
+
 template <typename TSystem, typename ...TArgs>
 void World::AddSystem(TArgs &&...args) {
-    TSystem *newSystem(new TSystem(std::forward<TArgs>(args)...));
+    std::shared_ptr<TSystem> newSystem = std::make_shared<TSystem>(std::forward<TArgs>(args)...);
     systems.insert(std::make_pair(std::type_index(typeid(TSystem)), newSystem));
 }
 

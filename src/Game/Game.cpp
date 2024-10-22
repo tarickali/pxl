@@ -1,6 +1,8 @@
 #include "Game.h"
-#include "../Logger/Logger.h"
 #include "../ECS/ECS.h"
+#include "../Logger/Logger.h"
+#include "../Components.h"
+#include "../Systems.h"
 
 #include <iostream>
 #include <SDL2/SDL.h>
@@ -9,8 +11,10 @@
 
 
 Game::Game() {
-    Logger::Log("Game constructor called.");
     isRunning = false;
+    world = std::make_unique<World>();
+
+    Logger::Log("Game constructor called.");
 }
 
 Game::~Game() {
@@ -92,11 +96,31 @@ void Game::ProcessInput() {
 }
 
 void Game::Setup() {
-    // TODO:
-    // Entity tank = world.CreateEntity();
-    // tank.AddComponent<TransformComponent>();
-    // tank.AddComponent<BoxColliderComponent>();
-    // tank.AddComponent<SpriteComponent>("./assets/images/tank.png");
+    world->AddSystem<MovementSystem>();
+    world->AddSystem<RenderSystem>();
+
+    Entity tank = world->CreateEntity();
+    Entity truck = world->CreateEntity();
+
+    tank.AddComponent<TransformComponent>(
+        glm::vec2(10.0, 30.0),
+        glm::vec2(1.0, 1.0),
+        0.0
+    );
+    tank.AddComponent<RigidBodyComponent>(
+        glm::vec2(40.0, 0.0)
+    );
+    tank.AddComponent<SpriteComponent>(10, 10);
+
+    truck.AddComponent<TransformComponent>(
+        glm::vec2(100.0, 100.0),
+        glm::vec2(1.0, 1.0),
+        0.0
+    );
+    truck.AddComponent<RigidBodyComponent>(
+        glm::vec2(0.0, 50.0)
+    );
+    truck.AddComponent<SpriteComponent>(10, 50);
 }
 
 void Game::Update() {
@@ -116,30 +140,16 @@ void Game::Update() {
     millisecsPreviousFrame = SDL_GetTicks();
 
     // Update game objects
-    // TODO:
-    // MovementSystem.Update();
-    // CollisionSystem.Update();
+    world->GetSystem<MovementSystem>().Update(deltaTime);
+    world->Update();
 }
 
 void Game::Render() {
     SDL_SetRenderDrawColor(renderer, 21, 21, 21, 255);
     SDL_RenderClear(renderer);
 
-    // TODO: ...
-
-    // Draw a PNG texture
-    // SDL_Surface *surface = IMG_Load("./assets/images/tank-tiger-right.png");
-    // SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-    // SDL_FreeSurface(surface);
-
-    // SDL_Rect dstRect = { 
-    //     static_cast<int>(playerPosition.x),
-    //     static_cast<int>(playerPosition.y),
-    //     32,
-    //     32
-    // };
-    // SDL_RenderCopy(renderer, texture, NULL, &dstRect);
-    // SDL_DestroyTexture(texture); 
+    // Invoke all the systems that need to be updated
+    world->GetSystem<RenderSystem>().Update(renderer);
 
     SDL_RenderPresent(renderer);
 }

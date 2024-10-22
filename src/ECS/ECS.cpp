@@ -3,7 +3,7 @@
 
 #include <algorithm>
 
-int IComponent::nextId = 0;
+unsigned int IComponent::nextId = 0;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Entity
@@ -44,17 +44,20 @@ const Signature &System::GetComponentSignature() const {
 // World
 ////////////////////////////////////////////////////////////////////////////////
 Entity World::CreateEntity() {
-    Entity entity(numEntities++);
+    auto entityId = numEntities++;
+
+    Entity entity(entityId);
+    entity.world = this;
+
+    if (entityId >= entityComponentSignatures.size()) {
+        entityComponentSignatures.resize(entityId + 1);
+    }
+
     entitiesToBeCreated.insert(entity);
 
-    Logger::Log("Entity created with id = " + std::to_string(entity.GetId()));
+    Logger::Log("Entity created with id = " + std::to_string(entityId));
 
     return entity;
-}
-
-void World::Update() {
-    // Add the entities that are waiting to be created to the active Systems
-    // Remove the entities that are waiting to be created to the active Systems
 }
 
 void World::AddEntityToSystems(Entity entity) {
@@ -73,4 +76,14 @@ void World::AddEntityToSystems(Entity entity) {
         }
     }
 
+}
+
+void World::Update() {
+    // Add the entities that are waiting to be created to the active Systems
+    // Remove the entities that are waiting to be created to the active Systems
+
+    for (auto entity : entitiesToBeCreated) {
+        AddEntityToSystems(entity);
+    }
+    entitiesToBeCreated.clear();
 }

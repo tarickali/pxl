@@ -1,9 +1,10 @@
 #ifndef GAME_H
 #define GAME_H
 
+#include "../ECS/ECS.h"
 #include <SDL2/SDL.h>
 
-const int FPS = 60;
+const int FPS = 120;
 const int MILLISECS_PER_FRAME = 1000 / FPS;
 
 
@@ -13,6 +14,8 @@ class Game {
         int millisecsPreviousFrame;
         SDL_Window *window;
         SDL_Renderer *renderer;
+
+        std::unique_ptr<World> world;
 
     public:
         Game();
