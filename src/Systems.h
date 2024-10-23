@@ -102,4 +102,79 @@ class AnimationSystem : public System {
         }
 };
 
+class CollisionSystem : public System {
+    public:
+        CollisionSystem() {
+            RequireComponent<TransformComponent>();
+            RequireComponent<BoxColliderComponent>();
+        }
+
+        void Update() {
+            struct Box {
+                int left, right, top, bottom;
+            };
+
+            const auto entities = GetSystemEntities();
+
+            for (auto i=entities.begin(); i!=entities.end(); i++) {
+                const auto a = *i;
+
+                const auto aTransform = a.GetComponent<TransformComponent>();
+                const auto aCollider = a.GetComponent<BoxColliderComponent>();
+
+                for (auto j=std::next(i); j!=entities.end(); j++) {
+                    const auto b = *j;
+
+                    const auto bTransform = b.GetComponent<TransformComponent>();
+                    const auto bCollider = b.GetComponent<BoxColliderComponent>();
+
+                    bool collisionHappened = checkkAABBCollision(
+                        aTransform.position.x + aCollider.offset.x * aTransform.scale.x,
+                        aTransform.position.y + aCollider.offset.y * aTransform.scale.y,
+                        aCollider.width * aTransform.scale.x,
+                        aCollider.height * aTransform.scale.y,
+                        bTransform.position.x + bCollider.offset.x * bTransform.scale.x,
+                        bTransform.position.y + bCollider.offset.y * bTransform.scale.y,
+                        bCollider.width * bTransform.scale.x,
+                        bCollider.height * bTransform.scale.y
+                    );
+
+                    if (collisionHappened) {
+                        Logger::Log("Entity " + std::to_string(a.GetId()) + " is collidiing with " + std::to_string(b.GetId()));
+                    }
+                }
+            } 
+        }
+
+        bool checkkAABBCollision(double aX, double aY, double aW, double aH, double bX, double bY, double bW, double bH) {
+            return aX < bX + bW && aX + aW > bX && aY < bY + bH && aY + aH > bY;
+        }
+};
+
+class RenderCollisionSystem : public System {
+    public:
+        RenderCollisionSystem() {
+            RequireComponent<TransformComponent>();
+            RequireComponent<BoxColliderComponent>();
+        }
+
+        void Update(SDL_Renderer *renderer) {
+            for (auto entity : GetSystemEntities()) {
+                const auto transform = entity.GetComponent<TransformComponent>();
+                const auto collider = entity.GetComponent<BoxColliderComponent>();
+
+                SDL_Rect rect = {
+                    static_cast<int>(transform.position.x + collider.offset.x * transform.scale.x),
+                    static_cast<int>(transform.position.y + collider.offset.y * transform.scale.y),
+                    static_cast<int>(collider.width * transform.scale.x),
+                    static_cast<int>(collider.height * transform.scale.y)
+                };
+
+                SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+                SDL_RenderDrawRect(renderer, &rect);
+            }
+        }
+
+};
+
 #endif

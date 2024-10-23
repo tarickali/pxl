@@ -12,6 +12,8 @@ const int MILLISECS_PER_FRAME = 1000 / FPS;
 class Game {
     private:
         bool isRunning;
+        bool isDebug;
+
         int millisecsPreviousFrame;
         SDL_Window *window;
         SDL_Renderer *renderer;

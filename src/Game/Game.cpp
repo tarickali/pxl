@@ -14,6 +14,7 @@
 
 Game::Game() {
     isRunning = false;
+    isDebug = false;
 
     world = std::make_unique<World>();
     assetStore = std::make_unique<AssetStore>();
@@ -94,7 +95,10 @@ void Game::ProcessInput() {
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
                     isRunning = false;
                 }
-                break;
+                if (event.key.keysym.sym == SDLK_d) {
+                    isDebug = !isDebug;
+                }
+                break; 
         }
     }
 }
@@ -104,6 +108,8 @@ void Game::LoadLevel(int level) {
     world->AddSystem<MovementSystem>();
     world->AddSystem<RenderSystem>();
     world->AddSystem<AnimationSystem>();
+    world->AddSystem<CollisionSystem>();
+    world->AddSystem<RenderCollisionSystem>();
 
     // Adding asets to the asset store
     assetStore->AddTexture(renderer, "tank-image", "./assets/images/tank-panther-right.png");
@@ -182,10 +188,11 @@ void Game::LoadLevel(int level) {
         glm::vec2(20.0, 0.0)
     );
     tank.AddComponent<SpriteComponent>("tank-image", 32, 32, 1);
+    tank.AddComponent<BoxColliderComponent>(32, 32, glm::vec2(0));
 
     Entity truck = world->CreateEntity();
     truck.AddComponent<TransformComponent>(
-        glm::vec2(100.0, 100.0),
+        glm::vec2(500.0, 10.0),
         glm::vec2(1.0, 1.0),
         0.0
     );
@@ -193,6 +200,7 @@ void Game::LoadLevel(int level) {
         glm::vec2(-30.0, 0.0)
     );
     truck.AddComponent<SpriteComponent>("truck-image", 32, 32, 1);
+    truck.AddComponent<BoxColliderComponent>(32, 32, glm::vec2(0));
 }
 
 void Game::Setup() {
@@ -218,6 +226,8 @@ void Game::Update() {
     // Update game objects
     world->GetSystem<MovementSystem>().Update(deltaTime);
     world->GetSystem<AnimationSystem>().Update();
+    world->GetSystem<CollisionSystem>().Update();
+
     world->Update();
 }
 
@@ -227,6 +237,10 @@ void Game::Render() {
 
     // Invoke all the systems that need to be updated
     world->GetSystem<RenderSystem>().Update(renderer, assetStore);
+
+    if (isDebug) {
+        world->GetSystem<RenderCollisionSystem>().Update(renderer);
+    }
 
     SDL_RenderPresent(renderer);
 }
