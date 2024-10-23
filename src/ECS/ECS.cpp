@@ -12,6 +12,10 @@ unsigned int Entity::GetId() const {
     return id;
 }
 
+void Entity::Destroy() {
+    world->DestroyEntity(*this);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // System
 ////////////////////////////////////////////////////////////////////////////////
@@ -44,15 +48,20 @@ const Signature &System::GetComponentSignature() const {
 // World
 ////////////////////////////////////////////////////////////////////////////////
 Entity World::CreateEntity() {
-    auto entityId = numEntities++;
+    unsigned int entityId;
+
+    if (freeIds.empty()) {
+        entityId = numEntities++;
+        if (entityId >= entityComponentSignatures.size()) {
+            entityComponentSignatures.resize(entityId + 1);
+        }
+    } else {
+        entityId = freeIds.front();
+        freeIds.pop_front();
+    }
 
     Entity entity(entityId);
     entity.world = this;
-
-    if (entityId >= entityComponentSignatures.size()) {
-        entityComponentSignatures.resize(entityId + 1);
-    }
-
     entitiesToBeCreated.insert(entity);
 
     Logger::Log("Entity created with id = " + std::to_string(entityId));
@@ -60,10 +69,15 @@ Entity World::CreateEntity() {
     return entity;
 }
 
+void World::DestroyEntity(Entity entity) {
+    entitiesToBeDestroyed.insert(entity);
+    Logger::Log("Entity destroyed with id = " + std::to_string(entity.GetId()));
+}
+
 void World::AddEntityToSystems(Entity entity) {
     const auto entityId = entity.GetId();
 
-    // TODO: Match entityComponentSignature <---> systemComponentSignature
+    // Match entityComponentSignature <---> systemComponentSignature
     const auto &entityComponentSignature = entityComponentSignatures[entityId];
 
     for (auto &system : systems) {
@@ -75,7 +89,12 @@ void World::AddEntityToSystems(Entity entity) {
             system.second->AddEntityToSystem(entity);
         }
     }
+}
 
+void World::RemoveEntityFromSystems(Entity entity) {
+    for (auto &system : systems) {
+        system.second->RemoveEntityFromSystem(entity);
+    }
 }
 
 void World::Update() {
@@ -86,4 +105,13 @@ void World::Update() {
         AddEntityToSystems(entity);
     }
     entitiesToBeCreated.clear();
+
+    for (auto entity : entitiesToBeDestroyed) {
+        RemoveEntityFromSystems(entity);
+        entityComponentSignatures[entity.GetId()].reset();
+
+        // Make the entity id available to be reused
+        freeIds.push_back(entity.GetId());
+    }
+    entitiesToBeDestroyed.clear();
 }

@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <typeindex>
 #include <set>
+#include <deque>
 #include <memory>
 
 
@@ -33,6 +34,7 @@ class Entity {
     public:
         Entity(int id) : id(id) {};
         Entity(const Entity &entity) = default;
+        void Destroy();
         unsigned int GetId() const;
 
         Entity &operator =(const Entity &other) = default;
@@ -137,6 +139,9 @@ class World {
         std::set<Entity> entitiesToBeCreated;
         std::set<Entity> entitiesToBeDestroyed;
 
+        // List of free entity ids that were previously removed
+        std::deque<unsigned int> freeIds;
+
         // Vector of component pools, each pool contains all the data for a
         // certain component type.
         // [Vector index = component type id]
@@ -161,7 +166,7 @@ class World {
 
         // Entity management
         Entity CreateEntity();
-        // void DestroyEntity(Entity entity);
+        void DestroyEntity(Entity entity);
 
         // Component management
         template <typename TComponent, typename ...TArgs> void AddComponent(Entity entity, TArgs &&...args);
@@ -178,6 +183,7 @@ class World {
         // Checks the component signature of an entity and add the entity to the
         // systems that are interested in it 
         void AddEntityToSystems(Entity entity);
+        void RemoveEntityFromSystems(Entity entity);
 
         void Update();
 

@@ -117,13 +117,13 @@ class CollisionSystem : public System {
             const auto entities = GetSystemEntities();
 
             for (auto i=entities.begin(); i!=entities.end(); i++) {
-                const auto a = *i;
+                auto a = *i;
 
                 const auto aTransform = a.GetComponent<TransformComponent>();
                 const auto aCollider = a.GetComponent<BoxColliderComponent>();
 
                 for (auto j=std::next(i); j!=entities.end(); j++) {
-                    const auto b = *j;
+                    auto b = *j;
 
                     const auto bTransform = b.GetComponent<TransformComponent>();
                     const auto bCollider = b.GetComponent<BoxColliderComponent>();
@@ -140,6 +140,8 @@ class CollisionSystem : public System {
                     );
 
                     if (collisionHappened) {
+                        // TODO: Emit an event
+
                         Logger::Log("Entity " + std::to_string(a.GetId()) + " is collidiing with " + std::to_string(b.GetId()));
                     }
                 }
