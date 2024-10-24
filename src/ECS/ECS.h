@@ -32,6 +32,7 @@ class Entity {
         unsigned int id;
 
     public:
+        Entity() = default;
         Entity(int id) : id(id) {};
         Entity(const Entity &entity) = default;
         void Destroy();

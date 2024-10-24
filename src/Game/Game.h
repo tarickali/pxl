@@ -3,6 +3,8 @@
 
 #include "../ECS/ECS.h"
 #include "../AssetStore/AssetStore.h"
+#include "../Events/EventBus.h"
+
 #include <SDL2/SDL.h>
 
 const int FPS = 120;
@@ -20,6 +22,7 @@ class Game {
 
         std::unique_ptr<World> world;
         std::unique_ptr<AssetStore> assetStore;
+        std::unique_ptr<EventBus> eventBus;
 
     public:
         Game();

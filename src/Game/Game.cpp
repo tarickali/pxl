@@ -18,6 +18,7 @@ Game::Game() {
 
     world = std::make_unique<World>();
     assetStore = std::make_unique<AssetStore>();
+    eventBus = std::make_unique<EventBus>();
 
     Logger::Log("Game constructor called.");
 }
@@ -92,6 +93,7 @@ void Game::ProcessInput() {
                 isRunning = false;
                 break;
             case SDL_KEYDOWN:
+                eventBus->EmitEvent<KeyPressedEvent>(event.key.keysym.sym);
                 if (event.key.keysym.sym == SDLK_ESCAPE) {
                     isRunning = false;
                 }
@@ -110,6 +112,8 @@ void Game::LoadLevel(int level) {
     world->AddSystem<AnimationSystem>();
     world->AddSystem<CollisionSystem>();
     world->AddSystem<RenderCollisionSystem>();
+    world->AddSystem<DamageSystem>();
+    world->AddSystem<KeyboardMovementSystem>();
 
     // Adding asets to the asset store
     assetStore->AddTexture(renderer, "tank-image", "./assets/images/tank-panther-right.png");
@@ -223,12 +227,21 @@ void Game::Update() {
     // Store the current frame time
     millisecsPreviousFrame = SDL_GetTicks();
 
-    // Update game objects
+    // Reset all event handlers for the current frame
+    eventBus->Reset();
+
+    // Perform the subscription of the events for all systems
+    world->GetSystem<DamageSystem>().SubscribeToEvents(eventBus);
+    world->GetSystem<KeyboardMovementSystem>().SubscribeToEvents(eventBus);
+
+    // Update the world to process the entities that are to be created/destroyed
+    world->Update();
+
+    // Invoke all the systems that need to update
     world->GetSystem<MovementSystem>().Update(deltaTime);
     world->GetSystem<AnimationSystem>().Update();
-    world->GetSystem<CollisionSystem>().Update();
+    world->GetSystem<CollisionSystem>().Update(eventBus);
 
-    world->Update();
 }
 
 void Game::Render() {

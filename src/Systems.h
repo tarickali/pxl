@@ -5,7 +5,10 @@
 #include "Components.h"
 #include "Logger/Logger.h"
 #include "AssetStore/AssetStore.h"
+#include "Events/EventBus.h"
+#include "Events/Events.h"
 
+#include <string>
 #include <algorithm>
 #include <SDL2/SDL.h>
 
@@ -109,7 +112,7 @@ class CollisionSystem : public System {
             RequireComponent<BoxColliderComponent>();
         }
 
-        void Update() {
+        void Update(std::unique_ptr<EventBus> &eventBus) {
             struct Box {
                 int left, right, top, bottom;
             };
@@ -140,9 +143,8 @@ class CollisionSystem : public System {
                     );
 
                     if (collisionHappened) {
-                        // TODO: Emit an event
-
-                        Logger::Log("Entity " + std::to_string(a.GetId()) + " is collidiing with " + std::to_string(b.GetId()));
+                        eventBus->EmitEvent<CollisionEvent>(a, b);
+                        Logger::Log("Entity " + std::to_string(a.GetId()) + " is colliding with " + std::to_string(b.GetId()));
                     }
                 }
             } 
@@ -176,7 +178,48 @@ class RenderCollisionSystem : public System {
                 SDL_RenderDrawRect(renderer, &rect);
             }
         }
+};
 
+class DamageSystem : public System {
+    public:
+        DamageSystem() {
+            RequireComponent<BoxColliderComponent>();
+        }
+
+        void onCollision(CollisionEvent &event) {
+            Logger::Log("The DamageSystem recieved a collision event between entities " + std::to_string(event.a.GetId()) + " & " + std::to_string(event.b.GetId()));
+            event.a.Destroy();
+            event.b.Destroy();
+        }
+
+        void SubscribeToEvents(std::unique_ptr<EventBus> &eventBus) {
+            eventBus->SubscribeToEvent<CollisionEvent>(this, &DamageSystem::onCollision);
+        }
+
+        void Update() {
+
+        }
+};
+
+class KeyboardMovementSystem : public System {
+    public:
+        KeyboardMovementSystem() {
+
+        }
+
+        void onKeyPress(KeyPressedEvent &event) {
+            std::string keyCode = std::to_string(event.symbol);
+            std::string keySymbol(1, event.symbol);
+            Logger::Log("Key pressed even emitted: [" + keyCode + "] " + keySymbol);
+        }
+
+        void SubscribeToEvents(std::unique_ptr<EventBus> &eventBus) {
+            eventBus->SubscribeToEvent<KeyPressedEvent>(this, &KeyboardMovementSystem::onKeyPress);
+        }
+
+        void Update() {
+
+        }
 };
 
 #endif
